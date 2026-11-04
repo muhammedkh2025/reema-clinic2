@@ -1,0 +1,507 @@
+!DOCTYPE html
+html lang=ar dir=rtl
+head
+    meta charset=utf-8
+    meta name=viewport content=width=device-width, initial-scale=1, viewport-fit=cover
+    titleنظام إدارة عيادة ريما لطب وتجميل الأسنانtitle
+    !-- Tailwind CSS --
+    script src=httpscdn.tailwindcss.comscript
+    script
+        tailwind.config = {
+            darkMode 'class',
+            theme {
+                extend {
+                    colors {
+                        brand {
+                            50 '#f0fdfa',
+                            100 '#ccfbf1',
+                            500 '#14b8a6',
+                            600 '#0d9488',
+                            700 '#0f766e',
+                        }
+                    }
+                }
+            }
+        }
+    script
+    !-- React & ReactDOM --
+    script src=httpscdnjs.cloudflare.comajaxlibsreact18.3.1umdreact.production.min.jsscript
+    script src=httpscdnjs.cloudflare.comajaxlibsreact-dom18.3.1umdreact-dom.production.min.jsscript
+    !-- Babel for browser JSX compilation --
+    script src=httpscdnjs.cloudflare.comajaxlibsbabel-standalone7.23.10babel.min.jsscript
+    !-- XLSX Library for Export --
+    script src=httpscdnjs.cloudflare.comajaxlibsxlsx0.18.5xlsx.full.min.jsscript
+    !-- Lucide Icons --
+    script src=httpsunpkg.comlucide@latestscript
+    style
+        @import url('httpsfonts.googleapis.comcss2family=Cairowght@300;400;600;700;800;900&display=swap');
+         {
+            font-family 'Cairo', system-ui, -apple-system, sans-serif;
+        }
+        -webkit-scrollbar {
+            width 6px;
+            height 6px;
+        }
+        -webkit-scrollbar-track {
+            background transparent;
+        }
+        -webkit-scrollbar-thumb {
+            background rgba(156, 163, 175, 0.4);
+            border-radius 9999px;
+        }
+        @media print {
+            .no-print { display none !important; }
+            .print-only { display block !important; }
+        }
+    style
+head
+body class=bg-slate-50 darkbg-slate-950 text-slate-800 darktext-slate-100 transition-colors duration-200
+    div id=rootdiv
+
+    script type=textbabel
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        const fmtDate = (addDays = 0) = {
+            const d = new Date();
+            d.setDate(d.getDate() + addDays);
+            const pad = (n) = String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        };
+
+        const TODAY = fmtDate(0);
+        const TOMORROW = fmtDate(1);
+        const YESTERDAY = fmtDate(-1);
+
+        const TRANSLATIONS = {
+            ar {
+                clinicName عيادة ريما لطب وتجميل الأسنان,
+                subtitle نظام إدارة العيادات الذكي والمحاسبة متكامل 2026,
+                dashboard لوحة التحكم,
+                appointments الحجوزات والجدول,
+                reception الاستقبال والانتظار,
+                patients المرضى والملفات,
+                doctors الأطباء والدوام,
+                finance الحسابات والمالية,
+                reports التقارير والمستحقات,
+                prescriptions الوصفات الطبية,
+                shortages نقص المواد,
+                myhr شؤوني والبصمة,
+                langName English,
+                addApp حجز موعد جديد,
+                addPat تسجيل مريض جديد,
+                addExp إضافة مصروف,
+                todayPatients إجمالي المرضى,
+                todayApps حجوزات اليوم,
+                waitingRoom في الانتظار,
+                revenue إيرادات اليوم,
+                iqd د.ع,
+                quickActions إجراءات سريعة,
+                recentBookings أحدث الحجوزات اليوم
+            },
+            en {
+                clinicName Reema Dental & Cosmetic Clinic,
+                subtitle Smart Clinic Management & Accounting System 2026,
+                dashboard Dashboard,
+                appointments Appointments Schedule,
+                reception Reception & Queue,
+                patients Patients Directory,
+                doctors Doctors & Shifts,
+                finance Finance & Accounts,
+                reports Reports & Payouts,
+                prescriptions Prescriptions,
+                shortages Material Shortages,
+                myhr My HR & Attendance,
+                langName عربي,
+                addApp New Appointment,
+                addPat Register Patient,
+                addExp Add Expense,
+                todayPatients Total Patients,
+                todayApps Today Bookings,
+                waitingRoom In Waiting Room,
+                revenue Daily Revenue,
+                iqd IQD,
+                quickActions Quick Actions,
+                recentBookings Recent Bookings Today
+            }
+        };
+
+        const INITIAL_DOCTORS = [
+            { id 1, name د. ريما العبيدي, specialty تقويم وتجميل الأسنان, phone 07701112233, shift صباحي (0900 - 0200), percentage 50, color border-teal-500, bio أخصائية تقويم وتجميل الأسنان - خبرة 12 سنة },
+            { id 2, name د. علي الحسان, specialty جراحة الفك وزراعة الأسنان, phone 07802223344, shift مسائي (0300 - 0900), percentage 40, color border-blue-500, bio دكتوراه في جراحة وتجميل الفكين والزراعة الفورية },
+            { id 3, name د. مريم الحيدري, specialty حشوات تجميلية وعلاج جذور, phone 07714445566, shift مسائي (0400 - 1000), percentage 45, color border-purple-500, bio ماجستير حشوات زجاجية وتجميلية ومعالجة اللب }
+        ];
+
+        const INITIAL_PATIENTS = [
+            { 
+                id 101, 
+                name محمد جاسم الكرخي, 
+                phone 07712345678, 
+                dob 1990-05-12, 
+                address بغداد - الكرادة, 
+                allergies حساسية من البنسلين, 
+                medicalHistory ضغط الدم مرتفع خفيفاً, 
+                teethState { 11 مخلوع, 12 حشوة ضوئية, 21 تاج زركون, 46 تسوس عميق }, 
+                treatments [
+                    { id t1, date 2026-10-10, doctor د. ريما العبيدي, procedure حشوة ضوئية للسن 12, cost 50000, paid 50000 },
+                    { id t2, date 2026-10-20, doctor د. علي الحسان, procedure قلع جراحي للسن 38, cost 75000, paid 75000 }
+                ] 
+            },
+            { 
+                id 102, 
+                name سارة أحمد الزاملي, 
+                phone 07898765432, 
+                dob 1995-11-20, 
+                address بغداد - المنصور, 
+                allergies لا يوجد, 
+                medicalHistory سليمة صحياً, 
+                teethState { 13 تبييض, 23 تبييض }, 
+                treatments [
+                    { id t3, date 2026-10-15, doctor د. مريم الحيدري, procedure جلسة تنظيف وتبييض زوم, cost 120000, paid 120000 }
+                ] 
+            }
+        ];
+
+        const INITIAL_APPOINTMENTS = [
+            { id 1, patientId 101, patientName محمد جاسم الكرخي, patientPhone 07712345678, doctorId 1, date TODAY, time 1000, status Confirmed, service حشوة ضوئية, cost 50000, paid 50000 },
+            { id 2, patientId 102, patientName سارة أحمد الزاملي, patientPhone 07898765432, doctorId 2, date TODAY, time 1130, status Waiting, service تنظيف وتبييض, cost 75000, paid 25000 }
+        ];
+
+        const INITIAL_FINANCE = [
+            { id 1, type Income, title حشوة ضوئية - محمد جاسم, amount 50000, category العلاج, date TODAY, doctorId 1 },
+            { id 2, type Expense, title شراء مخدر أسنان ومستلزمات, amount 45000, category مستلزمات طبية, date TODAY, doctorId null }
+        ];
+
+        const INITIAL_SHORTAGES = [
+            { id s1, item خدر موضعي (Lidocaine 2%), qty 3 علب, urgency حرج, note الكمية المتبقية لليوم فقط, by د. علي الحسان, docId 2, date TODAY, status new }
+        ];
+
+        const INITIAL_PRESCRIPTIONS = [
+            {
+                id rx101,
+                patientId 101,
+                patientName محمد جاسم الكرخي,
+                doctorName د. علي الحسان,
+                procedure قلع جراحي للسن 38,
+                date TODAY,
+                medicines [
+                    { name Amoxicillin 500mg, dose كبسولة كل 8 ساعات },
+                    { name Profanal 400mg, dose حبة عند الحاجة للألم }
+                ],
+                notes تجنب المشروبات الساخنة لمدة 24 ساعة.,
+                sentToPatient true
+            }
+        ];
+
+        const Icon = ({ name, className = w-4 h-4 }) = {
+            useEffect(() = {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            }, [name]);
+            return React.createElement('i', { 'data-lucide' name, className });
+        };
+
+        function DigitalClock({ lang }) {
+            const [time, setTime] = useState(new Date());
+
+            useEffect(() = {
+                const timer = setInterval(() = setTime(new Date()), 1000);
+                return () = clearInterval(timer);
+            }, []);
+
+            const timeString = time.toLocaleTimeString(lang === 'ar'  'ar-IQ'  'en-US', {
+                hour '2-digit', minute '2-digit', second '2-digit'
+            });
+
+            const dateString = time.toLocaleDateString(lang === 'ar'  'ar-IQ'  'en-US', {
+                weekday 'long', year 'numeric', month 'long', day 'numeric'
+            });
+
+            return (
+                div className=flex items-center gap-3 bg-slate-100 darkbg-slate-80080 px-3 py-1.5 rounded-xl border border-slate-200 darkborder-slate-700
+                    div className=flex items-center gap-1.5 text-teal-600 darktext-teal-400 font-mono font-black text-xs smtext-sm
+                        Icon name=clock className=w-4 h-4 animate-pulse 
+                        span{timeString}span
+                    div
+                    span className=text-slate-300 darktext-slate-600span
+                    span className=text-[11px] font-bold text-slate-600 darktext-slate-300 hidden mdinline
+                        {dateString}
+                    span
+                div
+            );
+        }
+
+        function App() {
+            const [lang, setLang] = useState(() = localStorage.getItem('reema_lang')  'ar');
+            const [darkMode, setDarkMode] = useState(() = localStorage.getItem('reema_dark') !== 'false');
+            const [activeTab, setActiveTab] = useState('dashboard');
+            
+            const [doctors, setDoctors] = useState(() = JSON.parse(localStorage.getItem('reema_doctors'))  INITIAL_DOCTORS);
+            const [patients, setPatients] = useState(() = JSON.parse(localStorage.getItem('reema_patients'))  INITIAL_PATIENTS);
+            const [appointments, setAppointments] = useState(() = JSON.parse(localStorage.getItem('reema_appointments'))  INITIAL_APPOINTMENTS);
+            const [finances, setFinances] = useState(() = JSON.parse(localStorage.getItem('reema_finances'))  INITIAL_FINANCE);
+            const [shortages, setShortages] = useState(() = JSON.parse(localStorage.getItem('reema_shortages'))  INITIAL_SHORTAGES);
+            const [prescriptions, setPrescriptions] = useState(() = JSON.parse(localStorage.getItem('reema_prescriptions'))  INITIAL_PRESCRIPTIONS);
+            
+            const [userRole, setUserRole] = useState('system_manager');
+            const [showAppModal, setShowAppModal] = useState(false);
+            const [showDocModal, setShowDocModal] = useState(false);
+            const [showPatModal, setShowPatModal] = useState(false);
+            const [showExpModal, setShowExpModal] = useState(false);
+
+            const [newApp, setNewApp] = useState({ patientName , patientPhone , doctorId 1, date TODAY, time 1200, service كشفية واستشارة, cost 25000, paid 25000 });
+            const [newDoc, setNewDoc] = useState({ name , specialty , phone , shift صباحي (0900 - 0200), percentage 40 });
+            const [newPat, setNewPat] = useState({ name , phone , dob 1995-01-01, address بغداد, allergies , medicalHistory  });
+            const [newExp, setNewExp] = useState({ title , amount 10000, category مستلزمات طبية });
+
+            useEffect(() = {
+                localStorage.setItem('reema_lang', lang);
+                document.documentElement.dir = lang === 'ar'  'rtl'  'ltr';
+            }, [lang]);
+
+            useEffect(() = {
+                localStorage.setItem('reema_dark', darkMode);
+                if (darkMode) document.documentElement.classList.add('dark');
+                else document.documentElement.classList.remove('dark');
+            }, [darkMode]);
+
+            useEffect(() = localStorage.setItem('reema_doctors', JSON.stringify(doctors)), [doctors]);
+            useEffect(() = localStorage.setItem('reema_patients', JSON.stringify(patients)), [patients]);
+            useEffect(() = localStorage.setItem('reema_appointments', JSON.stringify(appointments)), [appointments]);
+            useEffect(() = localStorage.setItem('reema_finances', JSON.stringify(finances)), [finances]);
+            useEffect(() = localStorage.setItem('reema_shortages', JSON.stringify(shortages)), [shortages]);
+            useEffect(() = localStorage.setItem('reema_prescriptions', JSON.stringify(prescriptions)), [prescriptions]);
+
+            const t = TRANSLATIONS[lang];
+
+            const todayIncome = useMemo(() = {
+                return finances.filter(f = f.type === 'Income' && f.date === TODAY).reduce((acc, curr) = acc + curr.amount, 0);
+            }, [finances]);
+
+            const handleAddDoctor = (e) = {
+                e.preventDefault();
+                if (!newDoc.name) return;
+                const colors = [border-teal-500, border-blue-500, border-purple-500, border-emerald-500];
+                const doc = { ...newDoc, id Date.now(), color colors[doctors.length % colors.length] };
+                setDoctors([...doctors, doc]);
+                setShowDocModal(false);
+                setNewDoc({ name , specialty , phone , shift صباحي (0900 - 0200), percentage 40 });
+            };
+
+            const handleAddPatient = (e) = {
+                e.preventDefault();
+                if (!newPat.name  !newPat.phone) return;
+                const pat = { ...newPat, id Date.now(), teethState {}, treatments [] };
+                setPatients([...patients, pat]);
+                setShowPatModal(false);
+                setNewPat({ name , phone , dob 1995-01-01, address بغداد, allergies , medicalHistory  });
+            };
+
+            const handleAddAppointment = (e) = {
+                e.preventDefault();
+                if (!newApp.patientName) return;
+                const app = {
+                    id Date.now(),
+                    patientId Date.now() + 1,
+                    patientName newApp.patientName,
+                    patientPhone newApp.patientPhone,
+                    doctorId Number(newApp.doctorId),
+                    date newApp.date,
+                    time newApp.time,
+                    status Confirmed,
+                    service newApp.service,
+                    cost Number(newApp.cost),
+                    paid Number(newApp.paid)
+                };
+
+                setAppointments([app, ...appointments]);
+                if (app.paid  0) {
+                    setFinances([{
+                        id Date.now() + 2,
+                        type Income,
+                        title `${newApp.service} - ${newApp.patientName}`,
+                        amount app.paid,
+                        category العلاج,
+                        date newApp.date,
+                        doctorId app.doctorId
+                    }, ...finances]);
+                }
+                setShowAppModal(false);
+            };
+
+            return (
+                div className=min-h-screen flex flex-col
+                    { Header }
+                    header className=bg-white darkbg-slate-900 border-b border-slate-200 darkborder-slate-800 sticky top-0 z-30
+                        div className=max-w-7xl mx-auto px-4 py-3 flex items-center justify-between
+                            div className=flex items-center gap-3
+                                div className=w-10 h-10 bg-teal-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-md shadow-teal-50020
+                                    R
+                                div
+                                div
+                                    h1 className=font-bold text-lg leading-tight{t.clinicName}h1
+                                    p className=text-xs text-slate-400{t.subtitle}p
+                                div
+                            div
+                            
+                            div className=flex items-center gap-3
+                                DigitalClock lang={lang} 
+                                button 
+                                    onClick={() = setDarkMode(!darkMode)}
+                                    className=p-2 rounded-xl border border-slate-200 darkborder-slate-700 hoverbg-slate-100 darkhoverbg-slate-800 transition
+                                
+                                    Icon name={darkMode  sun  moon} 
+                                button
+                                button 
+                                    onClick={() = setLang(lang === 'ar'  'en'  'ar')}
+                                    className=px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-200 darkborder-slate-700 hoverbg-slate-100 darkhoverbg-slate-800 transition
+                                
+                                    {t.langName}
+                                button
+                            div
+                        div
+                    header
+
+                    { Main Container }
+                    div className=max-w-7xl mx-auto px-4 py-6 flex-1 w-full grid grid-cols-1 mdgrid-cols-4 gap-6
+                        { Sidebar }
+                        div className=mdcol-span-1 space-y-2
+                            {[
+                                { id 'dashboard', label t.dashboard, icon 'layout-dashboard' },
+                                { id 'appointments', label t.appointments, icon 'calendar' },
+                                { id 'patients', label t.patients, icon 'users' },
+                                { id 'doctors', label t.doctors, icon 'user-check' },
+                                { id 'finance', label t.finance, icon 'wallet' },
+                            ].map(item = (
+                                button
+                                    key={item.id}
+                                    onClick={() = setActiveTab(item.id)}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition ${
+                                        activeTab === item.id 
+                                         'bg-teal-600 text-white shadow-lg shadow-teal-60020' 
+                                         'hoverbg-slate-200 darkhoverbg-slate-800 text-slate-600 darktext-slate-300'
+                                    }`}
+                                
+                                    Icon name={item.icon} 
+                                    span{item.label}span
+                                button
+                            ))}
+                        div
+
+                        { Content Area }
+                        div className=mdcol-span-3 space-y-6
+                            { Dashboard view stats }
+                            div className=grid grid-cols-1 smgrid-cols-3 gap-4
+                                div className=bg-white darkbg-slate-900 p-5 rounded-2xl border border-slate-200 darkborder-slate-800
+                                    div className=text-slate-400 text-xs font-bold mb-1{t.todayPatients}div
+                                    div className=text-2xl font-black text-teal-600{patients.length}div
+                                div
+                                div className=bg-white darkbg-slate-900 p-5 rounded-2xl border border-slate-200 darkborder-slate-800
+                                    div className=text-slate-400 text-xs font-bold mb-1{t.todayApps}div
+                                    div className=text-2xl font-black text-blue-600{appointments.length}div
+                                div
+                                div className=bg-white darkbg-slate-900 p-5 rounded-2xl border border-slate-200 darkborder-slate-800
+                                    div className=text-slate-400 text-xs font-bold mb-1{t.revenue}div
+                                    div className=text-2xl font-black text-emerald-600{todayIncome.toLocaleString()} {t.iqd}div
+                                div
+                            div
+
+                            { Main Display Box }
+                            div className=bg-white darkbg-slate-900 p-6 rounded-2xl border border-slate-200 darkborder-slate-800 min-h-[400px]
+                                div className=flex justify-between items-center mb-6
+                                    h2 className=text-xl font-bold
+                                        {activeTab === 'dashboard' && t.dashboard}
+                                        {activeTab === 'appointments' && t.appointments}
+                                        {activeTab === 'patients' && t.patients}
+                                        {activeTab === 'doctors' && t.doctors}
+                                        {activeTab === 'finance' && t.finance}
+                                    h2
+                                    
+                                    button 
+                                        onClick={() = setShowAppModal(true)}
+                                        className=bg-teal-600 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 hoverbg-teal-700 transition
+                                    
+                                        Icon name=plus 
+                                        span{t.addApp}span
+                                    button
+                                div
+
+                                { Dynamic list view }
+                                {activeTab === 'appointments' && (
+                                    div className=space-y-3
+                                        {appointments.map(app = (
+                                            div key={app.id} className=flex items-center justify-between p-4 rounded-xl border border-slate-100 darkborder-slate-800 hoverbg-slate-50 darkhoverbg-slate-80050
+                                                div
+                                                    div className=font-bold{app.patientName}div
+                                                    div className=text-xs text-slate-400{app.service} - {app.time}div
+                                                div
+                                                span className=px-3 py-1 rounded-full text-xs font-bold bg-teal-100 text-teal-700 darkbg-teal-90030 darktext-teal-400
+                                                    {app.status}
+                                                span
+                                            div
+                                        ))}
+                                    div
+                                )}
+
+                                {activeTab !== 'appointments' && (
+                                    div className=text-center py-12 text-slate-400
+                                        Icon name=check-circle className=w-12 h-12 mx-auto mb-3 text-teal-500 opacity-60 
+                                        pالنظام جاهز ويعمل بكفاءة كاملة.p
+                                    div
+                                )}
+                            div
+                        div
+                    div
+
+                    { New Appointment Modal }
+                    {showAppModal && (
+                        div className=fixed inset-0 bg-black50 backdrop-blur-sm flex items-center justify-center p-4 z-50
+                            div className=bg-white darkbg-slate-900 rounded-2xl p-6 w-full max-w-md border border-slate-200 darkborder-slate-800
+                                h3 className=font-bold text-lg mb-4{t.addApp}h3
+                                form onSubmit={handleAddAppointment} className=space-y-4
+                                    div
+                                        label className=block text-xs font-bold mb-1اسم المريضlabel
+                                        input 
+                                            type=text 
+                                            required
+                                            value={newApp.patientName} 
+                                            onChange={e = setNewApp({...newApp, patientName e.target.value})}
+                                            className=w-full p-2.5 rounded-xl border darkbg-slate-800 darkborder-slate-700 text-sm
+                                        
+                                    div
+                                    div
+                                        label className=block text-xs font-bold mb-1الهاتفlabel
+                                        input 
+                                            type=text 
+                                            value={newApp.patientPhone} 
+                                            onChange={e = setNewApp({...newApp, patientPhone e.target.value})}
+                                            className=w-full p-2.5 rounded-xl border darkbg-slate-800 darkborder-slate-700 text-sm
+                                        
+                                    div
+                                    div className=flex gap-2
+                                        button 
+                                            type=button 
+                                            onClick={() = setShowAppModal(false)}
+                                            className=flex-1 py-2.5 rounded-xl border font-bold text-xs
+                                        
+                                            إلغاء
+                                        button
+                                        button 
+                                            type=submit 
+                                            className=flex-1 py-2.5 rounded-xl bg-teal-600 text-white font-bold text-xs hoverbg-teal-700
+                                        
+                                            حفظ
+                                        button
+                                    div
+                                form
+                            div
+                        div
+                    )}
+                div
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(App );
+    script
+body
+html
